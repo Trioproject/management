@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>កូនចាបមាស - Stock Out</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, "Noto Sans Khmer", sans-serif;
+            background: #f5f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 25px;
+        }
+
+        h2 {
+            font-size: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            margin-bottom: 15px;
+        }
+
+        textarea {
+            min-height: 250px;
+            resize: vertical;
+            line-height: 1.7;
+        }
+
+        button {
+            border: 0;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .primary {
+            background: #222;
+            color: white;
+        }
+
+        .secondary {
+            background: #e9ecef;
+            color: #222;
+        }
+
+        .danger {
+            background: #ffe3e3;
+            color: #b00020;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        th:last-child,
+        td:last-child {
+            text-align: right;
+        }
+
+        .total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #222;
+        }
+
+        .error {
+            background: #fff1f1;
+            color: #b00020;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            white-space: pre-line;
+        }
+
+        .success {
+            background: #effff3;
+            color: #137333;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .empty {
+            color: #777;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px auto;
+                padding: 10px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            th,
+            td {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+        <h1>📚 កូនចាបមាស — Stock Out</h1>
+
+        <label for="date">កាលបរិច្ឆេទ</label>
+        <input type="date" id="date">
+
+        <label for="inputData">
+            Paste កញ្ចប់អីវ៉ាន់ ពី Telegram
+        </label>
+
+        <textarea id="inputData" placeholder="កញ្ចប់អីវ៉ាន់"></textarea>
+
+        <button class="primary" onclick="processStock()">
+            🔍 ស្រង់ទិន្នន័យ
+        </button>
+
+        <button class="secondary" onclick="clearAll()">
+            Clear
+        </button>
+
+        <div id="message"></div>
+    </div>
+
+
+    <div class="card" id="resultCard" style="display:none;">
+
+        <h2>📦 លទ្ធផល Stock Out</h2>
+
+        <div id="result"></div>
+
+        <button class="primary" onclick="copyResult()">
+            📋 Copy Result
+        </button>
+
+    </div>
+
+
+    <div class="card">
+        <h2>📖 Book Name Mapping</h2>
+
+        <p>
+            ឈ្មោះដែលអតិថិជន/Office សរសេរខ្លី
+            → ឈ្មោះពេញក្នុង System
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ឈ្មោះខ្លី</th>
+                    <th>ឈ្មោះពេញ</th>
+                </tr>
+            </thead>
+
+            <tbody id="mappingTable"></tbody>
+        </table>
+    </div>
+
+</div>
+
+
+<script>
+
+    // ==========================================
+    // BOOK NAME MAPPING — loaded from list.json
+    // ==========================================
+
+    let books = {};
+    let general = {};
+
+    async function loadBookList() {
+        try {
+            const response = await fetch("list.json");
+            if (!response.ok) throw new Error("Cannot load list.json");
+
+            const data = await response.json();
+
+            books = {};
+            general = {};
+
+            (data.books || []).forEach(book => {
+                if (!book.fullName || !Array.isArray(book.shortNames)) return;
+                book.shortNames.forEach(shortName => {
+                    books[normalizeText(shortName)] = book.fullName;
+                });
+                books[normalizeText(book.fullName)] = book.fullName;
+            });
+
+            (data.general || []).forEach(item => {
+                if (!item.fullName || !Array.isArray(item.shortNames)) return;
+                item.shortNames.forEach(shortName => {
+                    general[normalizeText(shortName)] = item.fullName;
+                });
+                general[normalizeText(item.fullName)] = item.fullName;
+            });
+
+            showMapping();
+        } catch (error) {
+            console.error(error);
+            document.getElementById("message").innerHTML = `
+                <div class="error">
+                    ⚠️ មិនអាច Load list.json បានទេ។<br>
+                    សូមដាក់ <b>index.html</b> និង <b>list.json</b> នៅក្នុង Folder តែមួយ។
+                </div>
+            `;
+        }
+    }
+
+
+    // ==========================================
+    // KHMER NUMBER → ENGLISH NUMBER
+    // ==========================================
+
+    function khmerNumberToEnglish(value) {
+
+        const khmerNumbers = {
+            "០": "0",
+            "១": "1",
+            "២": "2",
+            "៣": "3",
+            "៤": "4",
+            "៥": "5",
+            "៦": "6",
+            "៧": "7",
+            "៨": "8",
+            "៩": "9"
+        };
+
+        return value
+            .split("")
+            .map(char => khmerNumbers[char] ?? char)
+            .join("");
+    }
+
+
+    // ==========================================
+    // NORMALIZE TEXT
+    // ==========================================
+
+    function normalizeText(text) {
+
+        return text
+            .replace(/\u200B/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+
+    // ==========================================
+    // FORMAT DATE (YYYY-MM-DD -> DD-MM-YYYY)
+    // ==========================================
+
+    function formatDate(dateStr) {
+        const parts = dateStr.split("-");
+        if (parts.length !== 3) return dateStr;
+        const [y, m, d] = parts;
+        return `${d}-${m}-${y}`;
+    }
+
+
+    // ==========================================
+    // PARSE / TOTAL HELPERS
+    // ==========================================
+
+    function parseStockLine(line) {
+        line = normalizeText(line); if (!line) return null;
+        const match = line.match(/^(.+?)\s*[:\-]?\s*([0-9០-៩]+)\s*(ក្លង|ឡូ|ក្បាល|ដប)?\s*$/);
+        if (!match) return null;
+        const name = normalizeText(match[1]);
+        const qty = parseInt(khmerNumberToEnglish(match[2]), 10);
+        const unit = match[3] || "";
+        if (!qty || qty <= 0) return null;
+        return { name, qty, unit };
+    }
+    function addUnitTotal(target, fullName, qty, unit) {
+        if (!target[fullName]) target[fullName] = {};
+        const key = unit || "​";
+        target[fullName][key] = (target[fullName][key] || 0) + qty;
+    }
+    function formatUnitTotals(unitTotals) {
+        return Object.entries(unitTotals).map(([unit, qty]) => `${qty} ${unit}`).join(" + ");
+    }
+    function formatAllUnitTotals(totals) {
+        const units = {};
+        Object.values(totals).forEach(item => Object.entries(item).forEach(([u, q]) => units[u] = (units[u] || 0) + q));
+        return formatUnitTotals(units);
+    }
+
+
+    // ==========================================
+    // PROCESS STOCK
+    // ==========================================
+    function processStock() {
+        const input = document.getElementById("inputData").value;
+        const message = document.getElementById("message"); message.innerHTML = "";
+        if (!input.trim()) { message.innerHTML = `<div class="error">សូម Paste Stock Out ពី Telegram ជាមុនសិន។</div>`; return; }
+        const bookTotals = {}, generalTotals = {};
+        input.split(/\r?\n/).forEach(line => {
+            const parsed = parseStockLine(line); if (!parsed) return;
+            const {name, qty, unit} = parsed;
+            if (books[name]) addUnitTotal(bookTotals, books[name], qty, unit || "ក្បាល");
+            else if (general[name]) addUnitTotal(generalTotals, general[name], qty, unit);
+        });
+        if (!Object.keys(bookTotals).length && !Object.keys(generalTotals).length) {
+            message.innerHTML = `<div class="error">មិនអាចរកឃើញសៀវភៅ ឬ General Product ទេ។</div>`; return;
+        }
+        showResult(bookTotals, generalTotals);
+    }
+
+
+    // ==========================================
+    // SHOW RESULT
+    // ==========================================
+
+    function showResult(bookTotals, generalTotals) {
+        const resultCard = document.getElementById("resultCard"), result = document.getElementById("result");
+        resultCard.style.display = "block"; let html = "", bookTotal = 0, generalTotal = 0;
+        if (Object.keys(bookTotals).length) {
+            html += `<h3>📚 Books</h3><table><thead><tr><th>ឈ្មោះសៀវភៅ</th><th>ចំនួន</th></tr></thead><tbody>`;
+            Object.entries(bookTotals).forEach(([name, units]) => { const n = Object.values(units).reduce((a, b) => a + b, 0); bookTotal += n; html += `<tr><td>${name}</td><td>${formatUnitTotals(units)}</td></tr>`; });
+            html += `</tbody></table><div class="total"><span>សរុប Books</span><span>${formatAllUnitTotals(bookTotals)}</span></div>`;
+        }
+        if (Object.keys(generalTotals).length) {
+            html += `<h3 style="margin-top:30px;">🧴 General</h3><table><thead><tr><th>ផលិតផល</th><th>ចំនួន</th></tr></thead><tbody>`;
+            Object.entries(generalTotals).forEach(([name, units]) => { const n = Object.values(units).reduce((a, b) => a + b, 0); generalTotal += n; html += `<tr><td>${name}</td><td>${formatUnitTotals(units)}</td></tr>`; });
+            html += `</tbody></table><div class="total"><span>សរុប General</span><span>${formatAllUnitTotals(generalTotals)}</span></div>`;
+        }
+        html += `<div class="total"><span>សរុបរួម</span><span>${bookTotal + generalTotal} ​</span></div>`; result.innerHTML = html;
+    }
+
+
+    // ==========================================
+    // COPY RESULT
+    // ==========================================
+
+    function copyResult() {
+        const dateInput = document.getElementById("date").value;
+        const date = dateInput ? formatDate(dateInput) : formatDate(new Date().toISOString().split("T")[0]);
+        const bookTotals = {}, generalTotals = {};
+        document.getElementById("inputData").value.split(/\r?\n/).forEach(line => {
+            const p = parseStockLine(line); if (!p) return;
+            const {name, qty, unit} = p;
+            if (books[name]) addUnitTotal(bookTotals, books[name], qty, unit || "ក្បាល");
+            else if (general[name]) addUnitTotal(generalTotals, general[name], qty, unit);
+        });
+        let bookTotal = 0, generalTotal = 0, text = `📦 STOCK OUT — ${date}\n\n`;
+        if (Object.keys(bookTotals).length) { text += `📚 BOOKS\n`; Object.entries(bookTotals).forEach(([name, units]) => { bookTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុប Books = ${formatAllUnitTotals(bookTotals)}\n`; }
+        if (Object.keys(generalTotals).length) { text += `\n​ GENERAL\n`; Object.entries(generalTotals).forEach(([name, units]) => { generalTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុប General = ${formatAllUnitTotals(generalTotals)}\n`; }
+        text += `\n--------------------------\n`;
+        const allTotals = {};
+        [bookTotals, generalTotals].forEach(t => Object.values(t).forEach(units => Object.entries(units).forEach(([u, q]) => allTotals[u] = (allTotals[u] || 0) + q)));
+        text += `សរុបរួម = ${formatUnitTotals(allTotals)}`;
+
+        // Clipboard API often does not work when this HTML is opened directly with file://
+        // Use Clipboard API first, then fallback to a hidden textarea copy.
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                document.getElementById("message").innerHTML = `<div class="success">✅ Copy រួចរាល់! ឥឡូវ Paste ទៅ Telegram បាន។</div>`;
+            }).catch(() => fallbackCopy(text));
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        if (ok) {
+            document.getElementById("message").innerHTML = `<div class="success">✅ Copy រួចរាល់! ឥឡូវ Paste ទៅ Telegram បាន។</div>`;
+        } else {
+            // Last resort: select the text so the user can press Ctrl+C.
+            const ta2 = document.createElement("textarea");
+            ta2.value = text;
+            ta2.style.position = "fixed";
+            ta2.style.left = "10px";
+            ta2.style.top = "10px";
+            ta2.style.width = "90%";
+            ta2.style.height = "200px";
+            ta2.style.zIndex = "99999";
+            document.body.appendChild(ta2);
+            ta2.focus();
+            ta2.select();
+            document.getElementById("message").innerHTML = `<div class="success">📋 Text បានជ្រើសរួចហើយ។ ចុច Ctrl+C រួច Paste ទៅ Telegram។</div>`;
+        }
+    }
+
+
+    // ==========================================
+    // SHOW BOOK MAPPING
+    // ==========================================
+
+    function showMapping() {
+        const tbody = document.getElementById("mappingTable");
+
+        const bookRows = Object.entries(books)
+            .filter(([shortName, fullName]) => shortName !== fullName)
+            .map(([shortName, fullName]) => `
+                <tr>
+                    <td>${shortName}</td>
+                    <td>${fullName}</td>
+                </tr>
+            `);
+
+        const generalRows = Object.entries(general)
+            .filter(([shortName, fullName]) => shortName !== fullName)
+            .map(([shortName, fullName]) => `
+                <tr>
+                    <td>${shortName}</td>
+                    <td>${fullName}</td>
+                </tr>
+            `);
+
+        tbody.innerHTML = [
+            ...bookRows,
+            ...generalRows
+        ].join("");
+    }
+
+
+    // ==========================================
+    // CLEAR
+    // ==========================================
+
+    function clearAll() {
+        document.getElementById("inputData").value = "";
+        document.getElementById("message").innerHTML = "";
+        document.getElementById("resultCard").style.display = "none";
+        document.getElementById("result").innerHTML = "";
+    }
+
+
+    // ==========================================
+    // DEFAULT DATE
+    // ==========================================
+
+    document.getElementById("date").value =
+        new Date().toISOString().split("T")[0];
+
+    loadBookList();
+
+</script>
+
+</body>
+</html>
