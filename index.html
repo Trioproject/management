@@ -161,7 +161,7 @@
 <div class="container">
 
     <div class="card">
-        <h1>📚 កូនចាបមាស — Stock Out</h1>
+        <h1>កូនចាបមាស — Stock Out</h1>
 
         <label for="date">កាលបរិច្ឆេទ</label>
         <input type="date" id="date">
@@ -186,7 +186,7 @@
 
     <div class="card" id="resultCard" style="display:none;">
 
-        <h2>📦 លទ្ធផល Stock Out</h2>
+        <h2> លទ្ធផល​ </h2>
 
         <div id="result"></div>
 
@@ -198,11 +198,11 @@
 
 
     <div class="card">
-        <h2>📖 Book Name Mapping</h2>
+        <h2> Book Name Mapping</h2>
 
         <p>
-            ឈ្មោះដែលអតិថិជន/Office សរសេរខ្លី
-            → ឈ្មោះពេញក្នុង System
+            ឈ្មោះដែលអតិថិជន/សរសេរកាត់
+            → ឈ្មោះពេញ
         </p>
 
         <table>
@@ -377,12 +377,12 @@
         const resultCard = document.getElementById("resultCard"), result = document.getElementById("result");
         resultCard.style.display = "block"; let html = "", bookTotal = 0, generalTotal = 0;
         if (Object.keys(bookTotals).length) {
-            html += `<h3>📚 Books</h3><table><thead><tr><th>ឈ្មោះសៀវភៅ</th><th>ចំនួន</th></tr></thead><tbody>`;
+            html += `<table><thead><tr><th>ឈ្មោះសៀវភៅ</th><th>ចំនួន</th></tr></thead><tbody>`;
             Object.entries(bookTotals).forEach(([name, units]) => { const n = Object.values(units).reduce((a, b) => a + b, 0); bookTotal += n; html += `<tr><td>${name}</td><td>${formatUnitTotals(units)}</td></tr>`; });
-            html += `</tbody></table><div class="total"><span>សរុប Books</span><span>${formatAllUnitTotals(bookTotals)}</span></div>`;
+            html += `</tbody></table><div class="total"><span>សរុបរួម</span><span>${formatAllUnitTotals(bookTotals)}</span></div>`;
         }
         if (Object.keys(generalTotals).length) {
-            html += `<h3 style="margin-top:30px;">🧴 General</h3><table><thead><tr><th>ផលិតផល</th><th>ចំនួន</th></tr></thead><tbody>`;
+            html += `<h3 style="margin-top:30px;">General</h3><table><thead><tr><th>ផលិតផល</th><th>ចំនួន</th></tr></thead><tbody>`;
             Object.entries(generalTotals).forEach(([name, units]) => { const n = Object.values(units).reduce((a, b) => a + b, 0); generalTotal += n; html += `<tr><td>${name}</td><td>${formatUnitTotals(units)}</td></tr>`; });
             html += `</tbody></table><div class="total"><span>សរុប General</span><span>${formatAllUnitTotals(generalTotals)}</span></div>`;
         }
@@ -404,13 +404,9 @@
             if (books[name]) addUnitTotal(bookTotals, books[name], qty, unit || "ក្បាល");
             else if (general[name]) addUnitTotal(generalTotals, general[name], qty, unit);
         });
-        let bookTotal = 0, generalTotal = 0, text = `📦 STOCK OUT — ${date}\n\n`;
-        if (Object.keys(bookTotals).length) { text += `📚 BOOKS\n`; Object.entries(bookTotals).forEach(([name, units]) => { bookTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុប Books = ${formatAllUnitTotals(bookTotals)}\n`; }
-        if (Object.keys(generalTotals).length) { text += `\n​ GENERAL\n`; Object.entries(generalTotals).forEach(([name, units]) => { generalTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុប General = ${formatAllUnitTotals(generalTotals)}\n`; }
-        text += `\n--------------------------\n`;
-        const allTotals = {};
-        [bookTotals, generalTotals].forEach(t => Object.values(t).forEach(units => Object.entries(units).forEach(([u, q]) => allTotals[u] = (allTotals[u] || 0) + q)));
-        text += `សរុបរួម = ${formatUnitTotals(allTotals)}`;
+        let bookTotal = 0, generalTotal = 0, text = `Daily sale record — ${date}\n\n`;
+        if (Object.keys(bookTotals).length) { Object.entries(bookTotals).forEach(([name, units]) => { bookTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុបរួម = ${formatAllUnitTotals(bookTotals)}\n`; }
+        if (Object.keys(generalTotals).length) { text += `\n​ GENERAL\n`; Object.entries(generalTotals).forEach(([name, units]) => { generalTotal += Object.values(units).reduce((a, b) => a + b, 0); text += `${name} = ${formatUnitTotals(units)}\n`; }); text += `សរុបរួម = ${formatAllUnitTotals(generalTotals)}\n`; }
 
         // Clipboard API often does not work when this HTML is opened directly with file://
         // Use Clipboard API first, then fallback to a hidden textarea copy.
